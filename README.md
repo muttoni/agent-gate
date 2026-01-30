@@ -74,7 +74,16 @@ Hardening later:
 - optional binding tokens to gateway audience
 - Vercel KV store for challenges
 
+## Gateway integration (Vercel Middleware)
+Add `middleware.js` and set `AGENT_GATE_JWT_SECRET` in your environment.
+
+By default it protects:
+- `/api/protected`
+- `/api/private/*`
+
+Edit `config.matcher` to match your gateway surface.
+
 ## Files
-- `src/server/` API handlers
-- `src/sdk/` tiny TS client (`getAgentToken()`)
-- `src/gateway/` example middleware
+- `src/server/` signing + crypto utils
+- `src/sdk/` tiny client (`getAgentToken()`)
+- `middleware.js` vercel middleware gate
