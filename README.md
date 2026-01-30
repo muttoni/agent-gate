@@ -1,89 +1,101 @@
-# agent-gate (v0)
+# agent-gate
 
-A minimal **agent-only gate** for an API gateway.
+reverse captcha. prove you're not a human (by hand).
 
-Goal (v0): humans **cannot pass by hand**.
-Non-goal (v0): prevent a human from running code/agents to pass.
+## what it does
 
-Constraints from Andrea:
-- cloud only
-- fully anonymous
-- node + vercel
-- intended as an API gateway primitive
+- agents solve a small proof-of-work to get a token
+- your api routes check for that token
+- humans can't solve the pow manually (takes ~1-3 sec of computation)
 
-## ELI5
-It’s a captcha where the “puzzle” is annoying/impossible to do manually, but trivial to automate.
+## deploy your own
 
-We use a small proof-of-work (PoW) challenge + short-lived signed token.
+```bash
+# clone
+git clone https://github.com/muttoni/agent-gate
+cd agent-gate
 
-## API (v0)
-### 1) Create challenge
-`POST /api/agent-gate/challenge`
+# install
+npm install
+
+# set secret (any random string)
+echo "AGENT_GATE_SECRET=your-random-secret-here" > .env.local
+
+# deploy
+vercel deploy
+```
+
+## for agents
+
+```js
+import { getAgentToken } from './src/sdk'
+
+const { token } = await getAgentToken({
+  baseUrl: 'https://your-agent-gate.vercel.app'
+})
+
+// use token on protected routes
+fetch('https://your-agent-gate.vercel.app/api/protected/resource', {
+  headers: { authorization: 'Bearer ' + token }
+})
+```
+
+## api
+
+### 1. get challenge
+
+```
+POST /api/agent-gate/challenge
 
 Response:
-```json
 {
-  "challengeToken": "...",
-  "nonce": "...",
+  "challengeToken": "eyJ...",
+  "nonce": "abc123",
   "difficulty": 18,
-  "expiresAt": 1738250000
+  "expiresAt": 1234567890
 }
 ```
 
-### 2) Solve challenge + verify
-Client finds a `solution` such that:
+### 2. solve & verify
 
-`sha256(nonce + ":" + solution)` has `difficulty` leading zero **bits**.
+find `solution` where `sha256(nonce + ':' + solution)` has `difficulty` leading zero bits.
 
-`POST /api/agent-gate/verify`
-
-Request:
-```json
-{ "challengeToken": "...", "solution": "..." }
 ```
+POST /api/agent-gate/verify
+Content-Type: application/json
+
+{ "challengeToken": "eyJ...", "solution": "129785" }
 
 Response:
-```json
-{ "token": "<jwt>", "expiresAt": 1738250000 }
+{
+  "token": "eyJ...",
+  "expiresAt": 1234567890
+}
 ```
 
-### 3) Use token
-Call protected APIs with:
+### 3. use token
 
-`Authorization: Bearer <jwt>`
+```
+GET /api/protected/*
+Authorization: Bearer <token>
+```
 
-Gateway middleware verifies signature + expiry.
+## protect your routes
 
-## Why PoW?
-- Humans can’t do it by hand.
-- Agents can do it in milliseconds/seconds.
-- No identity needed.
-- Easy to integrate (single function).
+edit `middleware.js` to set which routes require agent tokens:
 
-## Threat model (v0)
-Stops:
-- manual humans
+```js
+export const config = {
+  matcher: ['/api/protected/:path*']
+}
+```
 
-Does NOT stop:
-- humans running scripts/agents
-- token sharing (we keep it anonymous)
+## env vars
 
-Hardening later:
-- replay protection (challenge consume-once)
-- rate limiting per IP
-- optional binding tokens to gateway audience
-- Vercel KV store for challenges
+| var | description |
+|-----|-------------|
+| `AGENT_GATE_SECRET` | signing secret for tokens (required) |
 
-## Gateway integration (Vercel Middleware)
-Add `middleware.js` and set `AGENT_GATE_JWT_SECRET` in your environment.
+## stateless
 
-By default it protects:
-- `/api/protected`
-- `/api/private/*`
-
-Edit `config.matcher` to match your gateway surface.
-
-## Files
-- `src/server/` signing + crypto utils
-- `src/sdk/` tiny client (`getAgentToken()`)
-- `middleware.js` vercel middleware gate
+no database. challenges and tokens are signed JWTs verified on each request.

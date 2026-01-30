@@ -1,67 +1,55 @@
-import { SignJWT, jwtVerify, createRemoteJWKSet } from 'jose';
-import { getPrivateKey, getPublicJwk, getKeyPair } from './keys.js';
+import { SignJWT, jwtVerify } from 'jose';
 
-// Agent token (issued after PoW verification)
-export async function mintToken({ audience, ttlSeconds = 600 }) {
-  const now = Math.floor(Date.now() / 1000);
-  const exp = now + ttlSeconds;
-  const privateKey = await getPrivateKey();
-  const { publicJwk } = await getKeyPair();
+const encoder = new TextEncoder();
 
-  const token = await new SignJWT({ typ: 'agent' })
-    .setProtectedHeader({ alg: 'ES256', kid: publicJwk.kid })
-    .setIssuedAt(now)
-    .setExpirationTime(exp)
-    .setAudience(audience)
-    .setIssuer('agent-gate')
-    .sign(privateKey);
-
-  return { token, expiresAt: exp };
+function getSecret() {
+  const s = process.env.AGENT_GATE_SECRET;
+  if (!s) throw new Error('Missing AGENT_GATE_SECRET env var');
+  return encoder.encode(s);
 }
 
-// Challenge token (short-lived, for PoW binding)
-export async function mintChallenge({ nonce, difficulty, audience, ttlSeconds = 60 }) {
+// Challenge token (short-lived, binds nonce + difficulty)
+export async function mintChallenge({ nonce, difficulty, ttlSeconds = 60 }) {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttlSeconds;
-  const privateKey = await getPrivateKey();
-  const { publicJwk } = await getKeyPair();
 
-  const token = await new SignJWT({ typ: 'challenge', nonce, difficulty, audience })
-    .setProtectedHeader({ alg: 'ES256', kid: publicJwk.kid })
+  const token = await new SignJWT({ typ: 'challenge', nonce, difficulty })
+    .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(now)
     .setExpirationTime(exp)
-    .setAudience('agent-gate-challenge')
     .setIssuer('agent-gate')
-    .sign(privateKey);
+    .sign(getSecret());
 
   return { token, expiresAt: exp };
 }
 
 export async function verifyChallenge(token) {
-  const { publicKey } = await getKeyPair();
-  const { payload } = await jwtVerify(token, publicKey, {
-    audience: 'agent-gate-challenge',
+  const { payload } = await jwtVerify(token, getSecret(), {
     issuer: 'agent-gate'
   });
+  if (payload.typ !== 'challenge') throw new Error('not a challenge token');
   return payload;
 }
 
-// For integrators: verify token using local public key (same deployment)
-export async function verifyToken(token, { audience } = {}) {
-  const { publicKey } = await getKeyPair();
-  const opts = { issuer: 'agent-gate' };
-  if (audience) opts.audience = audience;
-  const { payload } = await jwtVerify(token, publicKey, opts);
-  return payload;
+// Agent token (issued after PoW verification)
+export async function mintToken({ ttlSeconds = 600 }) {
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + ttlSeconds;
+
+  const token = await new SignJWT({ typ: 'agent' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .setIssuer('agent-gate')
+    .sign(getSecret());
+
+  return { token, expiresAt: exp };
 }
 
-// For integrators: verify token using remote JWKS (cross-origin)
-export function createVerifier(jwksUrl) {
-  const JWKS = createRemoteJWKSet(new URL(jwksUrl));
-  return async (token, { audience } = {}) => {
-    const opts = { issuer: 'agent-gate' };
-    if (audience) opts.audience = audience;
-    const { payload } = await jwtVerify(token, JWKS, opts);
-    return payload;
-  };
+export async function verifyToken(token) {
+  const { payload } = await jwtVerify(token, getSecret(), {
+    issuer: 'agent-gate'
+  });
+  if (payload.typ !== 'agent') throw new Error('not an agent token');
+  return payload;
 }

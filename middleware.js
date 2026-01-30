@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-import { getKeyPair } from './src/server/keys.js';
 
-async function verify(token) {
-  const { publicKey } = await getKeyPair();
-  const { payload } = await jwtVerify(token, publicKey, {
-    issuer: 'agent-gate'
-    // audience is checked per-route if needed
-  });
-  return payload;
+const encoder = new TextEncoder();
+
+function getSecret() {
+  const s = process.env.AGENT_GATE_SECRET;
+  if (!s) throw new Error('Missing AGENT_GATE_SECRET env var');
+  return encoder.encode(s);
 }
 
 export async function middleware(req) {
@@ -20,7 +18,8 @@ export async function middleware(req) {
   }
 
   try {
-    await verify(token);
+    const { payload } = await jwtVerify(token, getSecret(), { issuer: 'agent-gate' });
+    if (payload.typ !== 'agent') throw new Error('wrong token type');
   } catch {
     return NextResponse.json({ error: 'invalid_token' }, { status: 401 });
   }
@@ -28,8 +27,7 @@ export async function middleware(req) {
   return NextResponse.next();
 }
 
-// Protect only the routes you want behind the gate.
-// v0 defaults to protecting /api/protected and anything under /api/private.
+// Edit this to protect your routes
 export const config = {
-  matcher: ['/api/protected', '/api/private/:path*']
+  matcher: ['/api/protected/:path*']
 };

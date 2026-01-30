@@ -4,14 +4,11 @@ import { mintChallenge } from '../../../../server/jwt.js';
 
 export const runtime = 'nodejs';
 
-export async function POST(req) {
-  const url = new URL(req.url);
-  const audience = url.searchParams.get('audience') || 'default';
-
+export async function POST() {
   const nonce = randomNonce();
-  const difficulty = 18; // tune (v0: keep fast; humans can't do by hand)
+  const difficulty = 18; // ~1-3 seconds for code, impossible by hand
 
-  const { token, expiresAt } = await mintChallenge({ nonce, difficulty, audience, ttlSeconds: 60 });
+  const { token, expiresAt } = await mintChallenge({ nonce, difficulty, ttlSeconds: 60 });
 
-  return NextResponse.json({ challengeToken: token, nonce, difficulty, audience, expiresAt });
+  return NextResponse.json({ challengeToken: token, nonce, difficulty, expiresAt });
 }
