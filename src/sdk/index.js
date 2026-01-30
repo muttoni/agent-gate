@@ -1,7 +1,10 @@
 import { solvePow } from './pow.js';
 
-export async function getAgentToken({ baseUrl }) {
-  const challengeRes = await fetch(`${baseUrl}/api/agent-gate/challenge`, { method: 'POST' });
+export async function getAgentToken({ baseUrl, audience }) {
+  const challengeUrl = new URL('/api/agent-gate/challenge', baseUrl);
+  if (audience) challengeUrl.searchParams.set('audience', audience);
+
+  const challengeRes = await fetch(challengeUrl, { method: 'POST' });
   if (!challengeRes.ok) throw new Error('challenge_failed');
   const challenge = await challengeRes.json();
 
@@ -20,3 +23,5 @@ export async function getAgentToken({ baseUrl }) {
 
   return verifyRes.json();
 }
+
+export { createVerifier } from './verifier.js';

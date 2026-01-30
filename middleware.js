@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const encoder = new TextEncoder();
-
-function getSecret() {
-  const s = process.env.AGENT_GATE_JWT_SECRET;
-  if (!s) throw new Error('Missing AGENT_GATE_JWT_SECRET');
-  return encoder.encode(s);
-}
+import { getKeyPair } from './src/server/keys.js';
 
 async function verify(token) {
-  const { payload } = await jwtVerify(token, getSecret(), {
-    issuer: 'agent-gate',
-    audience: 'agent-gate'
+  const { publicKey } = await getKeyPair();
+  const { payload } = await jwtVerify(token, publicKey, {
+    issuer: 'agent-gate'
+    // audience is checked per-route if needed
   });
   return payload;
 }

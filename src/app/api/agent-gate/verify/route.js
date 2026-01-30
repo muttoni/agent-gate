@@ -26,6 +26,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'invalid_solution' }, { status: 400 });
   }
 
-  const { token, expiresAt } = await mintToken({ ttlSeconds: 600 });
-  return NextResponse.json({ token, expiresAt });
+  // audience comes from the challenge token (was set at challenge time)
+  const audience = challenge.audience || 'default';
+  const { token, expiresAt } = await mintToken({ audience, ttlSeconds: 600 });
+  return NextResponse.json({ token, audience, expiresAt });
 }
