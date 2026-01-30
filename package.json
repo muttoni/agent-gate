@@ -1,0 +1,19 @@
+{
+  "name": "agent-gate",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:pow": "node src/sdk/pow.test.js"
+  },
+  "dependencies": {
+    "jose": "^5.2.2",
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
