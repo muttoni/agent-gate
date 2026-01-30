@@ -1,5 +1,0 @@
-{
-  "/api/agent-gate/challenge/route": "app/api/agent-gate/challenge/route.js",
-  "/api/agent-gate/verify/route": "app/api/agent-gate/verify/route.js",
-  "/api/protected/route": "app/api/protected/route.js"
-}
